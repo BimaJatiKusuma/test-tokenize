@@ -98,7 +98,7 @@ class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
     return digest.toString();
   }
 
-  final String _serverBaseUrl = "http://192.168.100.65:8000";
+  final String _serverBaseUrl = "https://demo2.wirodev.com";
 
   @override
   void initState() {

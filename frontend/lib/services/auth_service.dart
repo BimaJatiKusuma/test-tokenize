@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'secure_storage_service.dart';
 
 class AuthService {
-  final String baseUrl = "http://192.168.100.65:8000"; 
+  final String baseUrl = "https://demo2.wirodev.com"; // Ganti dengan URL server Laravel Anda
   final SecureStorageService _storage = SecureStorageService();
 
   Future<Map<String, dynamic>> login(String email, String password) async {
