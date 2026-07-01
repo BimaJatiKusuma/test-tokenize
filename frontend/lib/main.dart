@@ -72,7 +72,7 @@ class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
   bool _isLoading = false;
 
   // Mock server base URL (Laravel dev server normally runs on 8000. In android emulator, localhost is 10.0.2.2)
-  final String _serverBaseUrl = "http://10.152.5.245:8000";
+  final String _serverBaseUrl = "http://192.168.100.65:8000";
 
   @override
   void initState() {
