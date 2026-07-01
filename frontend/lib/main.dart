@@ -3,10 +3,11 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:frontend/services/hardware_service.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'database_helper.dart';
-
+import 'package:crypto/crypto.dart';
 
 void main() {
   runApp(const MyApp());
@@ -71,6 +72,12 @@ class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
   String _statusMessage = "";
   bool _isLoading = false;
 
+String hashPIN(String pin) {
+  var bytes = utf8.encode(pin); 
+  var digest = sha256.convert(bytes);
+  return digest.toString();
+}
+
   // Mock server base URL (Laravel dev server normally runs on 8000. In android emulator, localhost is 10.0.2.2)
   final String _serverBaseUrl = "http://192.168.100.65:8000";
 
@@ -106,85 +113,129 @@ class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
         _dbEncryptedToken = info['encrypted_token'] ?? "";
         _dbLastTransactionTime = info['last_transaction_time'] ?? "";
       });
-      _validateLicense();
+      // _validateLicense();
+      validateOfflineAccess(_dbEncryptedToken).then((isValid) {
+        setState(() {
+          if (!isValid) {
+            _validationStatus = AppLicenseStatus.notActivated;
+            _statusMessage = "Aplikasi belum diaktivasi. Masukkan Key Lisensi Anda.";
+          } else {
+            _validationStatus = AppLicenseStatus.active;
+            _statusMessage = "APLIKASI AKTIF - Aman Digunakan Offline";
+          }
+        });
+      });
     }
   }
 
-  // CORE OFFLINE VALIDATION LOGIC
-  void _validateLicense() {
-    if (_dbEncryptedToken.isEmpty) {
-      setState(() {
-        _validationStatus = AppLicenseStatus.notActivated;
-        _statusMessage = "Aplikasi belum diaktivasi. Masukkan Key Lisensi Anda.";
-      });
-      return;
-    }
+  // // CORE OFFLINE VALIDATION LOGIC
+  // void _validateLicense() {
+  //   if (_dbEncryptedToken.isEmpty) {
+  //     setState(() {
+  //       _validationStatus = AppLicenseStatus.notActivated;
+  //       _statusMessage = "Aplikasi belum diaktivasi. Masukkan Key Lisensi Anda.";
+  //     });
+  //     return;
+  //   }
 
-    try {
-      // Decode Token Base64
-      final decodedBytes = base64.decode(_dbEncryptedToken);
-      final rawToken = utf8.decode(decodedBytes);
-      final parts = rawToken.split('|');
+  //   try {
+  //     // Decode Token Base64
+  //     final decodedBytes = base64.decode(_dbEncryptedToken);
+  //     final rawToken = utf8.decode(decodedBytes);
+  //     final parts = rawToken.split('|');
 
-      if (parts.length != 2) {
-        throw Exception("Invalid token format");
-      }
+  //     if (parts.length != 2) {
+  //       throw Exception("Invalid token format");
+  //     }
 
-      final String tokenDeviceId = parts[0];
-      final DateTime tokenExpiresAt = DateTime.parse(parts[1]);
+  //     final String tokenDeviceId = parts[0];
+  //     final DateTime tokenExpiresAt = DateTime.parse(parts[1]);
 
-      // Check 1: Device Cloning detection
-      if (_currentDeviceId != tokenDeviceId) {
-        setState(() {
-          _validationStatus = AppLicenseStatus.deviceCloned;
-          _statusMessage = "APLIKASI TERKUNCI: Perangkat Kloning Terdeteksi!";
-        });
-        return;
-      }
+  //     // Check 1: Device Cloning detection
+  //     if (_currentDeviceId != tokenDeviceId) {
+  //       setState(() {
+  //         _validationStatus = AppLicenseStatus.deviceCloned;
+  //         _statusMessage = "APLIKASI TERKUNCI: Perangkat Kloning Terdeteksi!";
+  //       });
+  //       return;
+  //     }
 
-      // Check 2: Expiration check
-      if (_currentSystemTime.isAfter(tokenExpiresAt)) {
-        setState(() {
-          _validationStatus = AppLicenseStatus.expired;
-          _statusMessage = "MASA AKTIF HABIS: Silakan Perpanjang Langganan.";
-        });
-        return;
-      }
+  //     // Check 2: Expiration check
+  //     if (_currentSystemTime.isAfter(tokenExpiresAt)) {
+  //       setState(() {
+  //         _validationStatus = AppLicenseStatus.expired;
+  //         _statusMessage = "MASA AKTIF HABIS: Silakan Perpanjang Langganan.";
+  //       });
+  //       return;
+  //     }
 
-      // Check 3: Clock/Time Tampering check
-      if (_dbLastTransactionTime.isNotEmpty) {
-        final DateTime lastTransaction = DateTime.parse(_dbLastTransactionTime);
-        if (_currentSystemTime.isBefore(lastTransaction)) {
-          setState(() {
-            _validationStatus = AppLicenseStatus.timeTampered;
-            _statusMessage = "ASET AMAN: Terdeteksi Kecurangan Manipulasi Jam!";
-          });
-          return;
-        }
-      }
+  //     // Check 3: Clock/Time Tampering check
+  //     if (_dbLastTransactionTime.isNotEmpty) {
+  //       final DateTime lastTransaction = DateTime.parse(_dbLastTransactionTime);
+  //       if (_currentSystemTime.isBefore(lastTransaction)) {
+  //         setState(() {
+  //           _validationStatus = AppLicenseStatus.timeTampered;
+  //           _statusMessage = "ASET AMAN: Terdeteksi Kecurangan Manipulasi Jam!";
+  //         });
+  //         return;
+  //       }
+  //     }
 
-      // If all checks pass -> ACTIVE. Write current time as last transaction time in DB.
-      setState(() {
-        _validationStatus = AppLicenseStatus.active;
-        _statusMessage = "APLIKASI AKTIF - Aman Digunakan Offline";
-      });
+  //     // If all checks pass -> ACTIVE. Write current time as last transaction time in DB.
+  //     setState(() {
+  //       _validationStatus = AppLicenseStatus.active;
+  //       _statusMessage = "APLIKASI AKTIF - Aman Digunakan Offline";
+  //     });
 
-      // Persist the current validation time as the last transaction time
-      DatabaseHelper.instance.updateLicenseInfo(
-        licenseKey: _dbLicenseKey,
-        encryptedToken: _dbEncryptedToken,
-        lastTransactionTime: _currentSystemTime.toIso8601String(),
-      );
+  //     // Persist the current validation time as the last transaction time
+  //     DatabaseHelper.instance.updateLicenseInfo(
+  //       licenseKey: _dbLicenseKey,
+  //       encryptedToken: _dbEncryptedToken,
+  //       lastTransactionTime: _currentSystemTime.toIso8601String(),
+  //     );
       
-      _dbLastTransactionTime = _currentSystemTime.toIso8601String();
+  //     _dbLastTransactionTime = _currentSystemTime.toIso8601String();
 
-    } catch (e) {
-      setState(() {
-        _validationStatus = AppLicenseStatus.notActivated;
-        _statusMessage = "Token tidak valid atau rusak. Silakan aktivasi ulang.";
-      });
+  //   } catch (e) {
+  //     setState(() {
+  //       _validationStatus = AppLicenseStatus.notActivated;
+  //       _statusMessage = "Token tidak valid atau rusak. Silakan aktivasi ulang.";
+  //     });
+  //   }
+  // }
+
+Future<bool> validateOfflineAccess(String offlineToken) async {
+  try {
+    // offlineToken bentuknya: base64(payload.signature)
+    String decoded = utf8.decode(base64Decode(offlineToken));
+    List<String> parts = decoded.split('.');
+    if (parts.length != 2) return false;
+
+    Map<String, dynamic> payload = jsonDecode(parts[0]);
+    String boundDeviceId = payload['device_id'];
+    int expiresTimestamp = payload['expires_at'];
+
+    // CEK ANTI-KLONING: Cocokkan Device ID token dengan HP fisik
+    HardwareService hw = HardwareService();
+    String currentDeviceId = await hw.getDeviceId();
+    
+    if (currentDeviceId != boundDeviceId) {
+       print("Aplikasi Terkunci: Perangkat Kloning Terdeteksi!");
+       return false;
     }
+
+    // CEK WAKTU: Pastikan belum expired
+    int currentTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    if (currentTimestamp > expiresTimestamp) {
+       print("Masa Aktif Habis");
+       return false;
+    }
+
+    return true; // Aplikasi Aman Dibuka
+  } catch (e) {
+    return false; // Token rusak/dimanipulasi
   }
+}
 
   Future<void> _activateLicense() async {
     final key = _licenseKeyController.text.trim();
@@ -276,7 +327,18 @@ class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
       final randomNum = Random().nextInt(10000);
       _currentDeviceId = "DEVICE-CLONE-$randomNum";
     });
-    _validateLicense();
+    // _validateLicense();
+    validateOfflineAccess(_dbEncryptedToken).then((isValid) {
+      setState(() {
+        if (!isValid) {
+          _validationStatus = AppLicenseStatus.deviceCloned;
+          _statusMessage = "APLIKASI TERKUNCI: Perangkat Kloning Terdeteksi!";
+        } else {
+          _validationStatus = AppLicenseStatus.active;
+          _statusMessage = "APLIKASI AKTIF - Aman Digunakan Offline";
+        }
+      });
+    });
     _showSnackbar("Simulasi: ID Perangkat diubah (Kloning)!");
   }
 
@@ -286,7 +348,18 @@ class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
       // Fast forward system clock to 32 days from now (exceeding 30 days validation)
       _currentSystemTime = DateTime.now().add(const Duration(days: 32));
     });
-    _validateLicense();
+    // _validateLicense();
+    validateOfflineAccess(_dbEncryptedToken).then((isValid) {
+      setState(() {
+        if (!isValid) {
+          _validationStatus = AppLicenseStatus.expired;
+          _statusMessage = "MASA AKTIF HABIS: Silakan Perpanjang Langganan.";
+        } else {
+          _validationStatus = AppLicenseStatus.active;
+          _statusMessage = "APLIKASI AKTIF - Aman Digunakan Offline";
+        }
+      });
+    });
     _showSnackbar("Simulasi: Jam dimajukan melewati masa aktif!");
   }
 
@@ -301,7 +374,18 @@ class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
         _currentSystemTime = DateTime.now().subtract(const Duration(days: 1));
       }
     });
-    _validateLicense();
+    // _validateLicense();
+    validateOfflineAccess(_dbEncryptedToken).then((isValid) {
+      setState(() {
+        if (!isValid) {
+          _validationStatus = AppLicenseStatus.timeTampered;
+          _statusMessage = "ASET AMAN: Terdeteksi Kecurangan Manipulasi Jam!";
+        } else {
+          _validationStatus = AppLicenseStatus.active;
+          _statusMessage = "APLIKASI AKTIF - Aman Digunakan Offline";
+        }
+      });
+    });
     _showSnackbar("Simulasi: Jam dimundurkan (Time Tampering)!");
   }
 
@@ -311,7 +395,18 @@ class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
       _currentSystemTime = DateTime.now();
     });
     _startSystemClock();
-    _validateLicense();
+    // _validateLicense();
+    validateOfflineAccess(_dbEncryptedToken).then((isValid) {
+      setState(() {
+        if (!isValid) {
+          _validationStatus = AppLicenseStatus.notActivated;
+          _statusMessage = "Aplikasi belum diaktivasi. Masukkan Key Lisensi Anda.";
+        } else {
+          _validationStatus = AppLicenseStatus.active;
+          _statusMessage = "APLIKASI AKTIF - Aman Digunakan Offline";
+        }
+      });
+    });
     _showSnackbar("Simulasi: Perangkat & Jam dikembalikan normal.");
   }
 
