@@ -8,6 +8,9 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'database_helper.dart';
 import 'package:crypto/crypto.dart';
+import 'screens/login_screen.dart';
+import 'screens/pin_screen.dart';
+import 'services/secure_storage_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -15,6 +18,21 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  // Fungsi untuk menentukan ke mana user harus pergi saat buka aplikasi
+  Future<Widget> _getInitialRoute() async {
+    final storage = SecureStorageService();
+    final savedPin = await storage.getLocalPIN();
+    
+    // Jika PIN lokal sudah ada, berarti user sudah pernah login. Arahkan ke Verify PIN.
+    if (savedPin != null && savedPin.isNotEmpty) {
+      return const PinScreen(isSetup: false);
+    } 
+    // Jika belum ada PIN, berarti baru instal / belum login. Arahkan ke Login (Online).
+    else {
+      return const LoginScreen();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +52,15 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const LicenseHomeScreen(),
+      home: FutureBuilder<Widget>(
+        future: _getInitialRoute(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+          return snapshot.data ?? const LoginScreen();
+        },
+      ),
     );
   }
 }
