@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+
 use Illuminate\Http\Request;
 
 use App\Models\License;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class LicenseController extends Controller
 {
@@ -37,51 +39,48 @@ class LicenseController extends Controller
         return redirect()->back()->with('success', 'License successfully set to expired!');
     }
 
-    public function activate(Request $request)
-    {
-        $request->validate([
-            'license_key' => 'required|string',
-            'device_id' => 'required|string',
-        ]);
+    
+// Tambahkan di atas: use Illuminate\Support\Facades\Auth;
 
-        $license = License::where('license_key', $request->license_key)->first();
+public function activate(Request $request)
+{
+    $request->validate([
+        'license_key' => 'required|string',
+        'device_id' => 'required|string',
+    ]);
 
-        if (!$license) {
-            return response()->json([
-                'success' => false,
-                'message' => 'License Key not found!'
-            ], 404);
-        }
+    $license = License::where('license_key', $request->license_key)->first();
+    $user = Auth::user(); // Diambil dari token Sanctum
 
-        if ($license->status === 'REVOKED') {
-            return response()->json([
-                'success' => false,
-                'message' => 'License has been revoked!'
-            ], 403);
-        }
-
-        // Allow activation if device matches, or if it is still available (empty device_id)
-        if ($license->device_id !== null && $license->device_id !== $request->device_id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'License is registered to another device!'
-            ], 400);
-        }
-
-        // Activate the license
-        $license->device_id = $request->device_id;
-        $license->status = 'ACTIVE';
-        $license->save();
-
-        // simple encyption base64: device_id + '|' + expires_at timestamp
-        $rawToken = $license->device_id . '|' . $license->expires_at->toIso8601String();
-        $encryptedToken = base64_encode($rawToken);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Activation successful!',
-            'encrypted_token' => $encryptedToken,
-            'expires_at' => $license->expires_at->toIso8601String(),
-        ]);
+    if (!$license || $license->status === 'REVOKED') {
+        return response()->json(['success' => false, 'message' => 'Lisensi tidak valid/dicabut!'], 403);
     }
+
+    if ($license->device_id !== null && $license->device_id !== $request->device_id) {
+        return response()->json(['success' => false, 'message' => 'Lisensi terdaftar di perangkat lain!'], 400);
+    }
+
+    // Bind lisensi ke User dan Device
+    $license->device_id = $request->device_id;
+    $license->user_id = $user->id; 
+    $license->status = 'ACTIVE';
+    $license->save();
+
+    // GENERATE SECURE OFFLINE TOKEN (HMAC SHA256)
+    $payload = json_encode([
+        'device_id' => $license->device_id,
+        'expires_at' => $license->expires_at->timestamp
+    ]);
+    
+    // Gunakan APP_KEY sebagai secret untuk HMAC
+    $signature = hash_hmac('sha256', $payload, env('APP_KEY'));
+    $secureOfflineToken = base64_encode($payload . '.' . $signature);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Aktivasi berhasil!',
+        'offline_token' => $secureOfflineToken,
+        'expires_at' => $license->expires_at->toIso8601String(),
+    ]);
+}
 }
