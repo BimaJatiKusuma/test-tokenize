@@ -263,7 +263,50 @@ Future<bool> validateOfflineAccess(String offlineToken) async {
   }
 }
 
-  Future<void> _activateLicense() async {
+  // Future<void> _activateLicense() async {
+  //   final key = _licenseKeyController.text.trim();
+  //   if (key.isEmpty) {
+  //     _showSnackbar("Harap masukkan License Key!");
+  //     return;
+  //   }
+
+  //   setState(() => _isLoading = true);
+
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse("$_serverBaseUrl/api/activate"),
+  //       headers: {"Content-Type": "application/json"},
+  //       body: jsonEncode({
+  //         "license_key": key,
+  //         "device_id": _currentDeviceId,
+  //       }),
+  //     ).timeout(const Duration(seconds: 10));
+
+  //     final data = jsonDecode(response.body);
+
+  //     if (response.statusCode == 200 && data['success'] == true) {
+  //       final String encryptedToken = data['encrypted_token'];
+
+  //       // Save to SQLite
+  //       await DatabaseHelper.instance.updateLicenseInfo(
+  //         licenseKey: key,
+  //         encryptedToken: encryptedToken,
+  //         lastTransactionTime: _currentSystemTime.toIso8601String(),
+  //       );
+
+  //       _showSnackbar("Aktivasi Server Berhasil!");
+  //       _loadFromDatabase();
+  //     } else {
+  //       _showSnackbar("Aktivasi Gagal: ${data['message'] ?? 'Respons error server'}");
+  //     }
+  //   } catch (e) {
+  //     _showSnackbar("Gagal menghubungi server. Pastikan server aktif dan online!");
+  //   } finally {
+  //     setState(() => _isLoading = false);
+  //   }
+  // }
+
+Future<void> _activateLicense() async {
     final key = _licenseKeyController.text.trim();
     if (key.isEmpty) {
       _showSnackbar("Harap masukkan License Key!");
@@ -273,9 +316,16 @@ Future<bool> validateOfflineAccess(String offlineToken) async {
     setState(() => _isLoading = true);
 
     try {
+      // Ambil token online dari Secure Storage
+      final storage = SecureStorageService();
+      final onlineToken = await storage.getOfflineToken(); // Pastikan Anda menambahkan metode getter ini di secure_storage_service.dart
+
       final response = await http.post(
         Uri.parse("$_serverBaseUrl/api/activate"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $onlineToken" // Tambahkan otorisasi ini
+        },
         body: jsonEncode({
           "license_key": key,
           "device_id": _currentDeviceId,
@@ -285,7 +335,8 @@ Future<bool> validateOfflineAccess(String offlineToken) async {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
-        final String encryptedToken = data['encrypted_token'];
+        // PERBAIKAN: Backend mengirim 'offline_token', bukan 'encrypted_token'
+        final String encryptedToken = data['offline_token']; 
 
         // Save to SQLite
         await DatabaseHelper.instance.updateLicenseInfo(
@@ -293,6 +344,9 @@ Future<bool> validateOfflineAccess(String offlineToken) async {
           encryptedToken: encryptedToken,
           lastTransactionTime: _currentSystemTime.toIso8601String(),
         );
+        
+        // Simpan juga ke secure storage
+        await storage.saveTokens(onlineToken: onlineToken ?? '', offlineToken: encryptedToken);
 
         _showSnackbar("Aktivasi Server Berhasil!");
         _loadFromDatabase();

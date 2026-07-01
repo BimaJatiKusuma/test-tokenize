@@ -17,17 +17,19 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
+        // Verifikasi keberadaan user dan kecocokan password
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Kredensial tidak valid'], 401);
+            return response()->json(['success' => false, 'message' => 'Kredensial tidak valid'], 401);
         }
 
-        // Generate Sanctum Token untuk sesi Online
+        // Buat token Sanctum
         $token = $user->createToken('mobile-app')->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'user' => $user,
+            'message' => 'Login berhasil',
             'access_token' => $token,
+            'user' => $user,
         ]);
     }
 }

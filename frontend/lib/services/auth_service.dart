@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'secure_storage_service.dart';
 
 class AuthService {
-  // Ganti IP dengan IP server lokal Laravel Anda
+  // Samakan dengan _serverBaseUrl di main.dart
   final String baseUrl = "http://192.168.100.65:8000"; 
   final SecureStorageService _storage = SecureStorageService();
 
@@ -21,7 +21,7 @@ class AuthService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
-        // Simpan token online ke Secure Storage
+        // Simpan token online ke Secure Storage OS
         await _storage.saveTokens(
           onlineToken: data['access_token'],
           offlineToken: await _storage.getOfflineToken() ?? '', 
@@ -31,7 +31,7 @@ class AuthService {
         return {'success': false, 'message': data['message'] ?? 'Login Gagal'};
       }
     } catch (e) {
-      return {'success': false, 'message': 'Gagal terhubung ke server (Cek koneksi internet)'};
+      return {'success': false, 'message': 'Gagal terhubung ke server (Timeout/Offline)'};
     }
   }
 }

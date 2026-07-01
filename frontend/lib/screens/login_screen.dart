@@ -33,8 +33,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (result['success']) {
-      // Jika login API sukses, arahkan ke halaman pembuatan PIN Lokal
       if (!mounted) return;
+      // Jika sukses, arahkan ke pembuatan PIN Lokal
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const PinScreen(isSetup: true)),
@@ -42,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'])),
+        SnackBar(content: Text(result['message'], style: const TextStyle(color: Colors.white))),
       );
     }
   }
@@ -56,7 +56,6 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.all(24.0),
           child: Card(
             elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
@@ -68,21 +67,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 32),
                   TextField(
                     controller: _emailController,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                    decoration: const InputDecoration(labelText: 'Email (test@example.com)'),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _passwordController,
                     obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                    decoration: const InputDecoration(labelText: 'Password (password)'),
                   ),
                   const SizedBox(height: 24),
                   _isLoading
@@ -92,10 +83,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             backgroundColor: const Color(0xFF002B93),
                             foregroundColor: Colors.white,
                             minimumSize: const Size(double.infinity, 50),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: _handleLogin,
-                          child: const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          child: const Text('Login'),
                         ),
                 ],
               ),
