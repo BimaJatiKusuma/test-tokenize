@@ -19,17 +19,13 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // Fungsi untuk menentukan ke mana user harus pergi saat buka aplikasi
   Future<Widget> _getInitialRoute() async {
     final storage = SecureStorageService();
     final savedPin = await storage.getLocalPIN();
     
-    // Jika PIN lokal sudah ada, berarti user sudah pernah login. Arahkan ke Verify PIN.
     if (savedPin != null && savedPin.isNotEmpty) {
       return const PinScreen(isSetup: false);
-    } 
-    // Jika belum ada PIN, berarti baru instal / belum login. Arahkan ke Login (Online).
-    else {
+    } else {
       return const LoginScreen();
     }
   }
@@ -41,9 +37,9 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF002B93), // Custom Navy Blue seed
-          primary: const Color(0xFF002B93),   // Navy Blue (#002B93)
-          secondary: const Color(0xFFCC5900), // Orange (#CC5900)
+          seedColor: const Color(0xFF002B93),
+          primary: const Color(0xFF002B93),
+          secondary: const Color(0xFFCC5900),
           error: const Color(0xFFD32F2F),
         ),
         cardTheme: const CardThemeData(
@@ -82,14 +78,12 @@ class LicenseHomeScreen extends StatefulWidget {
 
 class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
   final TextEditingController _licenseKeyController = TextEditingController();
-  final String _realDeviceId = "DEVICE-MOCK-REAL-99"; // Original device ID
+  final String _realDeviceId = "DEVICE-MOCK-REAL-99"; 
   
-  // Variables for simulation state
   String _currentDeviceId = "DEVICE-MOCK-REAL-99";
   DateTime _currentSystemTime = DateTime.now();
   Timer? _systemClockTimer;
 
-  // Local storage cache loaded from SQLite database
   String _dbLicenseKey = "";
   String _dbEncryptedToken = "";
   String _dbLastTransactionTime = "";
@@ -98,20 +92,18 @@ class _LicenseHomeScreenState extends State<LicenseHomeScreen> {
   String _statusMessage = "";
   bool _isLoading = false;
 
-String hashPIN(String pin) {
-  var bytes = utf8.encode(pin); 
-  var digest = sha256.convert(bytes);
-  return digest.toString();
-}
+  String hashPIN(String pin) {
+    var bytes = utf8.encode(pin); 
+    var digest = sha256.convert(bytes);
+    return digest.toString();
+  }
 
-  // Mock server base URL (Laravel dev server normally runs on 8000. In android emulator, localhost is 10.0.2.2)
   final String _serverBaseUrl = "http://192.168.100.65:8000";
 
   @override
   void initState() {
     super.initState();
     _loadFromDatabase();
-    // Start normal system clock ticking
     _startSystemClock();
   }
 
@@ -139,7 +131,6 @@ String hashPIN(String pin) {
         _dbEncryptedToken = info['encrypted_token'] ?? "";
         _dbLastTransactionTime = info['last_transaction_time'] ?? "";
       });
-      // _validateLicense();
       validateOfflineAccess(_dbEncryptedToken).then((isValid) {
         setState(() {
           if (!isValid) {
@@ -154,159 +145,50 @@ String hashPIN(String pin) {
     }
   }
 
-  // // CORE OFFLINE VALIDATION LOGIC
-  // void _validateLicense() {
-  //   if (_dbEncryptedToken.isEmpty) {
-  //     setState(() {
-  //       _validationStatus = AppLicenseStatus.notActivated;
-  //       _statusMessage = "Aplikasi belum diaktivasi. Masukkan Key Lisensi Anda.";
-  //     });
-  //     return;
-  //   }
-
-  //   try {
-  //     // Decode Token Base64
-  //     final decodedBytes = base64.decode(_dbEncryptedToken);
-  //     final rawToken = utf8.decode(decodedBytes);
-  //     final parts = rawToken.split('|');
-
-  //     if (parts.length != 2) {
-  //       throw Exception("Invalid token format");
-  //     }
-
-  //     final String tokenDeviceId = parts[0];
-  //     final DateTime tokenExpiresAt = DateTime.parse(parts[1]);
-
-  //     // Check 1: Device Cloning detection
-  //     if (_currentDeviceId != tokenDeviceId) {
-  //       setState(() {
-  //         _validationStatus = AppLicenseStatus.deviceCloned;
-  //         _statusMessage = "APLIKASI TERKUNCI: Perangkat Kloning Terdeteksi!";
-  //       });
-  //       return;
-  //     }
-
-  //     // Check 2: Expiration check
-  //     if (_currentSystemTime.isAfter(tokenExpiresAt)) {
-  //       setState(() {
-  //         _validationStatus = AppLicenseStatus.expired;
-  //         _statusMessage = "MASA AKTIF HABIS: Silakan Perpanjang Langganan.";
-  //       });
-  //       return;
-  //     }
-
-  //     // Check 3: Clock/Time Tampering check
-  //     if (_dbLastTransactionTime.isNotEmpty) {
-  //       final DateTime lastTransaction = DateTime.parse(_dbLastTransactionTime);
-  //       if (_currentSystemTime.isBefore(lastTransaction)) {
-  //         setState(() {
-  //           _validationStatus = AppLicenseStatus.timeTampered;
-  //           _statusMessage = "ASET AMAN: Terdeteksi Kecurangan Manipulasi Jam!";
-  //         });
-  //         return;
-  //       }
-  //     }
-
-  //     // If all checks pass -> ACTIVE. Write current time as last transaction time in DB.
-  //     setState(() {
-  //       _validationStatus = AppLicenseStatus.active;
-  //       _statusMessage = "APLIKASI AKTIF - Aman Digunakan Offline";
-  //     });
-
-  //     // Persist the current validation time as the last transaction time
-  //     DatabaseHelper.instance.updateLicenseInfo(
-  //       licenseKey: _dbLicenseKey,
-  //       encryptedToken: _dbEncryptedToken,
-  //       lastTransactionTime: _currentSystemTime.toIso8601String(),
-  //     );
+  Future<bool> validateOfflineAccess(String offlineToken) async {
+    try {
+      if (offlineToken.isEmpty) return false;
       
-  //     _dbLastTransactionTime = _currentSystemTime.toIso8601String();
+      String decoded = utf8.decode(base64Decode(offlineToken));
+      List<String> parts = decoded.split('.');
+      if (parts.length != 2) return false;
 
-  //   } catch (e) {
-  //     setState(() {
-  //       _validationStatus = AppLicenseStatus.notActivated;
-  //       _statusMessage = "Token tidak valid atau rusak. Silakan aktivasi ulang.";
-  //     });
-  //   }
-  // }
+      Map<String, dynamic> payload = jsonDecode(parts[0]);
+      String boundDeviceId = payload['device_id'];
+      int expiresTimestamp = payload['expires_at'];
 
-Future<bool> validateOfflineAccess(String offlineToken) async {
-  try {
-    // offlineToken bentuknya: base64(payload.signature)
-    String decoded = utf8.decode(base64Decode(offlineToken));
-    List<String> parts = decoded.split('.');
-    if (parts.length != 2) return false;
+      String currentDeviceId = _currentDeviceId;
+      
+      if (currentDeviceId != boundDeviceId) {
+         return false;
+      }
 
-    Map<String, dynamic> payload = jsonDecode(parts[0]);
-    String boundDeviceId = payload['device_id'];
-    int expiresTimestamp = payload['expires_at'];
+      int currentTimestamp = _currentSystemTime.millisecondsSinceEpoch ~/ 1000;
+      if (currentTimestamp > expiresTimestamp) {
+         return false;
+      }
 
-    // CEK ANTI-KLONING: Cocokkan Device ID token dengan HP fisik
-    HardwareService hw = HardwareService();
-    String currentDeviceId = await hw.getDeviceId();
-    
-    if (currentDeviceId != boundDeviceId) {
-       print("Aplikasi Terkunci: Perangkat Kloning Terdeteksi!");
-       return false;
+      if (_dbLastTransactionTime.isNotEmpty) {
+        final DateTime lastTransaction = DateTime.parse(_dbLastTransactionTime);
+        if (_currentSystemTime.isBefore(lastTransaction)) {
+           return false; // Time tampered
+        }
+      }
+
+      DatabaseHelper.instance.updateLicenseInfo(
+        licenseKey: _dbLicenseKey,
+        encryptedToken: _dbEncryptedToken,
+        lastTransactionTime: _currentSystemTime.toIso8601String(),
+      );
+      _dbLastTransactionTime = _currentSystemTime.toIso8601String();
+
+      return true; 
+    } catch (e) {
+      return false; 
     }
-
-    // CEK WAKTU: Pastikan belum expired
-    int currentTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    if (currentTimestamp > expiresTimestamp) {
-       print("Masa Aktif Habis");
-       return false;
-    }
-
-    return true; // Aplikasi Aman Dibuka
-  } catch (e) {
-    return false; // Token rusak/dimanipulasi
   }
-}
 
-  // Future<void> _activateLicense() async {
-  //   final key = _licenseKeyController.text.trim();
-  //   if (key.isEmpty) {
-  //     _showSnackbar("Harap masukkan License Key!");
-  //     return;
-  //   }
-
-  //   setState(() => _isLoading = true);
-
-  //   try {
-  //     final response = await http.post(
-  //       Uri.parse("$_serverBaseUrl/api/activate"),
-  //       headers: {"Content-Type": "application/json"},
-  //       body: jsonEncode({
-  //         "license_key": key,
-  //         "device_id": _currentDeviceId,
-  //       }),
-  //     ).timeout(const Duration(seconds: 10));
-
-  //     final data = jsonDecode(response.body);
-
-  //     if (response.statusCode == 200 && data['success'] == true) {
-  //       final String encryptedToken = data['encrypted_token'];
-
-  //       // Save to SQLite
-  //       await DatabaseHelper.instance.updateLicenseInfo(
-  //         licenseKey: key,
-  //         encryptedToken: encryptedToken,
-  //         lastTransactionTime: _currentSystemTime.toIso8601String(),
-  //       );
-
-  //       _showSnackbar("Aktivasi Server Berhasil!");
-  //       _loadFromDatabase();
-  //     } else {
-  //       _showSnackbar("Aktivasi Gagal: ${data['message'] ?? 'Respons error server'}");
-  //     }
-  //   } catch (e) {
-  //     _showSnackbar("Gagal menghubungi server. Pastikan server aktif dan online!");
-  //   } finally {
-  //     setState(() => _isLoading = false);
-  //   }
-  // }
-
-Future<void> _activateLicense() async {
+  Future<void> _activateLicense() async {
     final key = _licenseKeyController.text.trim();
     if (key.isEmpty) {
       _showSnackbar("Harap masukkan License Key!");
@@ -316,15 +198,15 @@ Future<void> _activateLicense() async {
     setState(() => _isLoading = true);
 
     try {
-      // Ambil token online dari Secure Storage
       final storage = SecureStorageService();
-      final onlineToken = await storage.getOfflineToken(); // Pastikan Anda menambahkan metode getter ini di secure_storage_service.dart
+      // Gunakan getOnlineToken()
+      final onlineToken = await storage.getOnlineToken(); 
 
       final response = await http.post(
         Uri.parse("$_serverBaseUrl/api/activate"),
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer $onlineToken" // Tambahkan otorisasi ini
+          "Authorization": "Bearer $onlineToken" 
         },
         body: jsonEncode({
           "license_key": key,
@@ -335,17 +217,14 @@ Future<void> _activateLicense() async {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
-        // PERBAIKAN: Backend mengirim 'offline_token', bukan 'encrypted_token'
         final String encryptedToken = data['offline_token']; 
 
-        // Save to SQLite
         await DatabaseHelper.instance.updateLicenseInfo(
           licenseKey: key,
           encryptedToken: encryptedToken,
           lastTransactionTime: _currentSystemTime.toIso8601String(),
         );
         
-        // Simpan juga ke secure storage
         await storage.saveTokens(onlineToken: onlineToken ?? '', offlineToken: encryptedToken);
 
         _showSnackbar("Aktivasi Server Berhasil!");
@@ -369,9 +248,15 @@ Future<void> _activateLicense() async {
     setState(() => _isLoading = true);
 
     try {
+      final storage = SecureStorageService();
+      final onlineToken = await storage.getOnlineToken(); 
+
       final response = await http.post(
         Uri.parse("$_serverBaseUrl/api/activate"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $onlineToken" // Otorisasi dibutuhkan route auth:sanctum
+        },
         body: jsonEncode({
           "license_key": _dbLicenseKey,
           "device_id": _currentDeviceId,
@@ -381,13 +266,16 @@ Future<void> _activateLicense() async {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
-        final String encryptedToken = data['encrypted_token'];
+        // Backend mengirimkan 'offline_token', bukan 'encrypted_token'
+        final String encryptedToken = data['offline_token'];
 
         await DatabaseHelper.instance.updateLicenseInfo(
           licenseKey: _dbLicenseKey,
           encryptedToken: encryptedToken,
           lastTransactionTime: _currentSystemTime.toIso8601String(),
         );
+        
+        await storage.saveTokens(onlineToken: onlineToken ?? '', offlineToken: encryptedToken);
 
         _showSnackbar("Sinkronisasi manual berhasil!");
         _loadFromDatabase();
@@ -403,11 +291,9 @@ Future<void> _activateLicense() async {
 
   void _simulateCloning() {
     setState(() {
-      // Randomize device ID
       final randomNum = Random().nextInt(10000);
       _currentDeviceId = "DEVICE-CLONE-$randomNum";
     });
-    // _validateLicense();
     validateOfflineAccess(_dbEncryptedToken).then((isValid) {
       setState(() {
         if (!isValid) {
@@ -425,10 +311,8 @@ Future<void> _activateLicense() async {
   void _simulateTimeExpiry() {
     _systemClockTimer?.cancel();
     setState(() {
-      // Fast forward system clock to 32 days from now (exceeding 30 days validation)
       _currentSystemTime = DateTime.now().add(const Duration(days: 32));
     });
-    // _validateLicense();
     validateOfflineAccess(_dbEncryptedToken).then((isValid) {
       setState(() {
         if (!isValid) {
@@ -446,7 +330,6 @@ Future<void> _activateLicense() async {
   void _simulateTimeTampering() {
     _systemClockTimer?.cancel();
     setState(() {
-      // Set system clock backward in time compared to the last database record
       if (_dbLastTransactionTime.isNotEmpty) {
         final DateTime lastTx = DateTime.parse(_dbLastTransactionTime);
         _currentSystemTime = lastTx.subtract(const Duration(hours: 2));
@@ -454,7 +337,6 @@ Future<void> _activateLicense() async {
         _currentSystemTime = DateTime.now().subtract(const Duration(days: 1));
       }
     });
-    // _validateLicense();
     validateOfflineAccess(_dbEncryptedToken).then((isValid) {
       setState(() {
         if (!isValid) {
@@ -475,7 +357,6 @@ Future<void> _activateLicense() async {
       _currentSystemTime = DateTime.now();
     });
     _startSystemClock();
-    // _validateLicense();
     validateOfflineAccess(_dbEncryptedToken).then((isValid) {
       setState(() {
         if (!isValid) {
@@ -506,13 +387,13 @@ Future<void> _activateLicense() async {
   Color _getStatusColor() {
     switch (_validationStatus) {
       case AppLicenseStatus.active:
-        return const Color(0xFF10B981); // Emerald Green
+        return const Color(0xFF10B981); 
       case AppLicenseStatus.deviceCloned:
-        return const Color(0xFFEF4444); // Red
+        return const Color(0xFFEF4444); 
       case AppLicenseStatus.expired:
-        return const Color(0xFFCC5900); // Orange
+        return const Color(0xFFCC5900); 
       case AppLicenseStatus.timeTampered:
-        return const Color(0xFF7F1D1D); // Dark Red
+        return const Color(0xFF7F1D1D); 
       case AppLicenseStatus.notActivated:
         return Colors.blueGrey;
     }
@@ -550,9 +431,6 @@ Future<void> _activateLicense() async {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // -------------------------------------------------------------
-              // A. BAGIAN ATAS: STATUS APLIKASI
-              // -------------------------------------------------------------
               Text(
                 "STATUS AKTIVASI APLIKASI",
                 style: TextStyle(
@@ -704,7 +582,6 @@ Future<void> _activateLicense() async {
               
               const SizedBox(height: 12),
               
-              // Device & time info card
               Card(
                 elevation: 1,
                 child: Padding(
@@ -767,9 +644,6 @@ Future<void> _activateLicense() async {
 
               const SizedBox(height: 32),
 
-              // -------------------------------------------------------------
-              // B. BAGIAN BAWAH: PANEL KONTROL SIMULASI
-              // -------------------------------------------------------------
               Row(
                 children: [
                   Text(
@@ -876,13 +750,9 @@ class LicenseKeyFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    // Convert to uppercase
     String text = newValue.text.toUpperCase();
-    
-    // Keep only alphanumeric characters
     String cleanText = text.replaceAll(RegExp(r'[^A-Z0-9]'), '');
     
-    // Automatically prepend 'LIC' if missing
     if (cleanText.length >= 3) {
       if (cleanText.substring(0, 3) != "LIC") {
         cleanText = "LIC$cleanText";
@@ -893,7 +763,6 @@ class LicenseKeyFormatter extends TextInputFormatter {
       }
     }
     
-    // Format to: LIC-XXXX-XXXX-XXXX
     String formatted = "";
     if (cleanText.isNotEmpty) {
       formatted += cleanText.substring(0, min(cleanText.length, 3));
@@ -918,4 +787,3 @@ class LicenseKeyFormatter extends TextInputFormatter {
     );
   }
 }
-

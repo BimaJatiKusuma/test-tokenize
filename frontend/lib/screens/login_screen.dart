@@ -34,7 +34,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (result['success']) {
       if (!mounted) return;
-      // Jika sukses, arahkan ke pembuatan PIN Lokal
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const PinScreen(isSetup: true)),

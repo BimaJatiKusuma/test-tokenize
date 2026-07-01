@@ -5,7 +5,7 @@ import 'package:frontend/main.dart';
 import '../services/secure_storage_service.dart';
 
 class PinScreen extends StatefulWidget {
-  final bool isSetup; // true = Buat PIN baru, false = Verifikasi PIN lama
+  final bool isSetup; 
   const PinScreen({super.key, required this.isSetup});
 
   @override
@@ -17,7 +17,6 @@ class _PinScreenState extends State<PinScreen> {
   final SecureStorageService _storage = SecureStorageService();
   String _errorMessage = '';
 
-  // Fungsi Hash PIN seperti yang kita bahas sebelumnya
   String _hashPIN(String pin) {
     var bytes = utf8.encode(pin);
     var digest = sha256.convert(bytes);
@@ -34,12 +33,10 @@ class _PinScreenState extends State<PinScreen> {
     final hashedPin = _hashPIN(pin);
 
     if (widget.isSetup) {
-      // MODE SETUP: Simpan PIN yang di-hash ke Secure Storage
       await _storage.saveLocalPIN(hashedPin);
       if (!mounted) return;
       _goToDashboard();
     } else {
-      // MODE VERIFY: Cek apakah PIN cocok dengan yang disimpan
       final savedHashedPin = await _storage.getLocalPIN();
       if (hashedPin == savedHashedPin) {
         if (!mounted) return;
@@ -63,7 +60,7 @@ class _PinScreenState extends State<PinScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF002B93), // Warna Navy Blue
+      backgroundColor: const Color(0xFF002B93), 
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
